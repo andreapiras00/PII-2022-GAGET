@@ -1,8 +1,9 @@
 from collections import defaultdict
 import copy
 
-
 class Alignment(object):
+    ''' Alignment class is used to convert the alignments from the aligner tool, in order to make access and
+    modifications to them easier'''
     __slots__ = ("path", "path_id", "s_ref", "e_ref", "s_node", "node1", "e_node", "node2", "score", "ref")
 
     def __init__(self, path, path_id, s_ref, e_ref, s_node, node1, e_node, node2, score, ref):
@@ -12,17 +13,20 @@ class Alignment(object):
         return ' '.join(str(x) for x in ['ref:', self.ref, 'start:', self.s_ref, 'end:', self.e_ref, '|', 'start node:', self.node1, 'position:', self.s_node, '|', 'end node:', self.node2, 'position:', self.e_node])
 
     def clone(self):
+        # clone method creates a deep copy of the current alignment.
         return Alignment(copy.deepcopy(self.path), self.path_id, self.s_ref, self.e_ref, self.s_node, self.node1, self.e_node, self.node2, self.score, self.ref)
     
     def start(self):
-        """Return start on ref (always <= end)"""
+        # start method returns the alignment's leftmost position on the reference.
         return min(self.s_ref, self.e_ref)
 
     def end(self):
-        """Return end on ref (always >= start)"""
+        # start method returns the alignment's rightmost position on the reference.
         return max(self.s_ref, self.e_ref)
 
     def remove_last_node(self, g):
+        # remove_last_node method removes the last node of the alignment's path and updates all required info, returning
+        # the score of the removed node.
         removed = self.path.pop(-1)
         self.e_ref = self.path[-1][1]
         self.score -= removed[3]
@@ -31,6 +35,8 @@ class Alignment(object):
         return removed[3]  
 
     def remove_first_node(self, g):
+        # remove_first_node method removes the first node of the alignment's path and updates all required info, returning
+        # the score of the removed node.
         removed = self.path.pop(0)
         self.s_ref = self.path[0][0]
         self.score -= removed[3]
@@ -39,16 +45,18 @@ class Alignment(object):
         return removed[3] 
 
     def distance_on_ref(self, other):
+        # distance_on_ref method returns the distance in bp between the alignments and another one.
         return other.start() - self.end()    
 
 
 def score(set, curr_align, g):
+    # score method removes the overlapping between the last alignments of the set and the current alignment,
+    # adds the align to the set, where one of the two has been reduced in case of an overlap and calculates the set's
+    # new score
     prev_align = set[0][-1]
     prev_score = set[1]
-    # Score(ai )
     al_score = curr_align.score
     new_score = prev_score + al_score
-    
     # new align and set don't overlap, return set with new align
     if curr_align.start() >= prev_align.end():
         set[0].append(curr_align)
@@ -88,9 +96,10 @@ def score(set, curr_align, g):
             return (set[0], new_score)   
 
 def score_set(alignment, sets, g):
+    # score_set method calculates the score for each candidate set with the current alignment and returns the
+    # one with the biggest score
     candidates = []
     for al_set in sets:
-        # Score(B ∪ ai )
         if not al_set[0]:
             candidates.append(([alignment], alignment.score))    
         # HEURISTIC: skip sets on which the last alignment's first node ends after the curr align's start position.
@@ -105,7 +114,8 @@ def score_set(alignment, sets, g):
             max_alignment = candidate     
     return max_alignment
 
-def best_alignments_selection(g, reference):   
+def best_alignments_selection(g, reference):  
+    # best_alignments_selection method returns the best set of non-overlapping alignments that map the reference. 
     # BestSets ← {(EmptyAlignment, 0)}
     BEST = defaultdict(lambda: defaultdict())
     for ref in reference:
@@ -122,7 +132,6 @@ def best_alignments_selection(g, reference):
             end_ref = int(end[1])
             start_node_id = start[4]
             end_node_id = end[4]
-            #TODO: check if in path of node the various reads are in the right order
             start_node = int(g.nodes[start_node_id]['pos_mapped'][path][0][0])
             end_node = int(g.nodes[end_node_id]['pos_mapped'][path][-1][1])
             align = Alignment(pos_mapped[path], path, start_ref, end_ref, start_node, start_node_id, end_node, end_node_id, score, ref)
